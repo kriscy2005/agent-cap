@@ -81,7 +81,7 @@ def build_brand_map() -> dict:
     global _brand_map
     if _brand_map is not None:
         return _brand_map
-    rows = _get_values("Brand<>Product!A:B")
+    rows = _get_values("'Brand<>Product'!A:B")
     result = {}
     for row in rows[1:]:  # skip header
         if len(row) < 2:
@@ -122,7 +122,7 @@ def build_people_map() -> dict:
     global _people_map
     if _people_map is not None:
         return _people_map
-    rows = _get_values("People<>Soln!A:H")
+    rows = _get_values("'People<>Brand'!A:H")
     result = {}
     for row in rows[1:]:
         name = safe_get(row, 1)
@@ -352,35 +352,25 @@ def log_bandwidth_submissions(entries: list):
 # ── getRecipientsFromTab ──────────────────────────────────────────────────────
 
 def get_recipients_from_tab() -> list:
-    """Read all recipients from Recipients tab. Returns [{name, email, designation}]."""
-    people_map = build_people_map()
-    rows = _get_values("Recipients!A:D")
+    """Read recipients from the Recipients tab.
+    Columns: Employee ID | Name | Designation | Brand 1 | Brand 2 | Brand 3 | Emails
+                0          1       2             3         4         5         6
+    """
+    rows = _get_values("Recipients!A:G")
     if not rows:
         return []
-
     result = []
     seen_email = set()
     for row in rows[1:]:  # skip header
         name = safe_get(row, 1)
         designation = safe_get(row, 2)
-        email = safe_get(row, 3)
-
-        if not name:
-            continue
-        # Fall back to email cache if tab cell is empty
-        if not is_valid_email(email):
-            email = build_email_cache().get(norm(name), "")
-        if not is_valid_email(email):
-            person = people_map.get(norm(name))
-            if person:
-                email = person.get("email", "")
-        if not is_valid_email(email):
+        email = safe_get(row, 6)
+        if not name or not is_valid_email(email):
             continue
         if email in seen_email:
             continue
         seen_email.add(email)
         result.append({"name": name, "email": email, "designation": designation})
-
     return result
 
 
