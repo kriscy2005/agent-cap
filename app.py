@@ -389,7 +389,9 @@ def admin_send_emails():
 # ── Auto-detect LAN IP and keep .env in sync ──────────────────────────────────
 
 def _sync_base_url():
-    """Detect current LAN IP and update BASE_URL in .env if it has changed."""
+    """Detect current LAN IP and update BASE_URL in .env if it has changed (local dev only)."""
+    if not _ENV_FILE.exists():
+        return  # Skip in production (Railway, etc.) where .env doesn't exist
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
