@@ -94,7 +94,10 @@ def send_all_emails(recipients: list) -> dict:
     """recipients: [{name, email}]. Returns {sent: [], failed: []}"""
     sent, failed = [], []
     try:
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
     except Exception as e:
         return {"sent": [], "failed": [{"name": r["name"], "email": r["email"], "error": str(e)} for r in recipients]}
@@ -122,7 +125,10 @@ def send_all_emails(recipients: list) -> dict:
         except smtplib.SMTPServerDisconnected:
             # Reconnect and retry once
             try:
-                server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+                server = smtplib.SMTP("smtp.gmail.com", 587)
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
                 server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
                 server.sendmail(GMAIL_USER, to_address, msg.as_string())
                 sent.append({"name": name, "email": to_address})
