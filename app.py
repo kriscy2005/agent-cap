@@ -13,8 +13,11 @@ from services import jira
 
 # Use public CSV reader when no service account exists; fall back to auth'd client for writes
 import os as _os
-_SA = _os.path.abspath(_os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service-account.json"))
-if _os.path.exists(_SA):
+_SA_JSON = _os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+_SA_PATH = _os.path.abspath(_os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service-account.json"))
+_has_sa = _SA_JSON or _os.path.exists(_SA_PATH)
+
+if _has_sa:
     from services import sheets as _sheet_reader
 else:
     from services import sheets_csv as _sheet_reader  # no-auth public CSV reads
@@ -22,7 +25,7 @@ else:
 # For writes: prefer Apps Script webhook (no SA needed), fall back to sheets.py (needs SA)
 if os.getenv("APPS_SCRIPT_URL"):
     from services import sheets_appscript as _sheet_writer
-elif _os.path.exists(_SA):
+elif _has_sa:
     from services import sheets as _sheet_writer
 else:
     _sheet_writer = None  # writes disabled until configured

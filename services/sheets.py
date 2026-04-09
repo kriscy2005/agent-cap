@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SHEET_ID = os.getenv("SHEET_ID")
+SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 SA_PATH = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service-account.json")
 QUARTER_LABEL = os.getenv("QUARTER_LABEL", "Q1'26")
 
@@ -28,8 +29,12 @@ def get_service():
     global _service
     if _service:
         return _service
-    sa_path = os.path.abspath(SA_PATH)
-    creds = service_account.Credentials.from_service_account_file(sa_path, scopes=SCOPES)
+    # Try env var first (Railway), then file (local)
+    if SA_JSON:
+        creds = service_account.Credentials.from_service_account_info(json.loads(SA_JSON), scopes=SCOPES)
+    else:
+        sa_path = os.path.abspath(SA_PATH)
+        creds = service_account.Credentials.from_service_account_file(sa_path, scopes=SCOPES)
     _service = build("sheets", "v4", credentials=creds, cache_discovery=False)
     return _service
 
