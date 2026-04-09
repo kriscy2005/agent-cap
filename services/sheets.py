@@ -349,6 +349,41 @@ def log_bandwidth_submissions(entries: list):
     ).execute()
 
 
+# ── getRecipientsFromTab ──────────────────────────────────────────────────────
+
+def get_recipients_from_tab() -> list:
+    """Read all recipients from Recipients tab. Returns [{name, email, designation}]."""
+    people_map = build_people_map()
+    rows = _get_values("Recipients!A:D")
+    if not rows:
+        return []
+
+    result = []
+    seen_email = set()
+    for row in rows[1:]:  # skip header
+        name = safe_get(row, 1)
+        designation = safe_get(row, 2)
+        email = safe_get(row, 3)
+
+        if not name:
+            continue
+        # Fall back to email cache if tab cell is empty
+        if not is_valid_email(email):
+            email = build_email_cache().get(norm(name), "")
+        if not is_valid_email(email):
+            person = people_map.get(norm(name))
+            if person:
+                email = person.get("email", "")
+        if not is_valid_email(email):
+            continue
+        if email in seen_email:
+            continue
+        seen_email.add(email)
+        result.append({"name": name, "email": email, "designation": designation})
+
+    return result
+
+
 # ── Cache clear (testing) ─────────────────────────────────────────────────────
 
 def clear_caches():
