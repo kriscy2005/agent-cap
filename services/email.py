@@ -93,11 +93,46 @@ def send_allocation_email(name: str, email: str) -> dict:
 def send_all_emails(recipients: list) -> dict:
     """recipients: [{name, email}]. Returns {sent: [], failed: []}"""
     sent, failed = [], []
+    try:
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+    except Exception as e:
+        return {"sent": [], "failed": [{"name": r["name"], "email": r["email"], "error": str(e)} for r in recipients]}
+
     for r in recipients:
-        result = send_allocation_email(r["name"], r["email"])
-        if result["sent"]:
-            sent.append({"name": r["name"], "email": result["to"]})
-        else:
-            failed.append({"name": r["name"], "email": result["to"], "error": result.get("error")})
-        time.sleep(0.3)  # respect Gmail rate limits
+        name = r["name"]
+        email = r["email"]
+        first_name = name.split()[0]
+        form_url = f"{BASE_URL}/form?creator={quote(name)}"
+        to_address = TEST_EMAIL if TEST_MODE else email
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = (
+            f"Action Required: {QUARTER_LABEL} Bandwidth Allocation"
+            + (f" [TEST — actual: {name} <{email}>]" if TEST_MODE and to_address != email else "")
+        )
+        msg["From"] = f"Product Operations <{GMAIL_USER}>"
+        msg["To"] = to_address
+        msg.attach(MIMEText(_build_html(first_name, form_url), "html"))
+
+        try:
+            server.sendmail(GMAIL_USER, to_address, msg.as_string())
+            print(f"[Email] Sent to {to_address} ({name})")
+            sent.append({"name": name, "email": to_address})
+        except smtplib.SMTPServerDisconnected:
+            # Reconnect and retry once
+            try:
+                server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+                server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+                server.sendmail(GMAIL_USER, to_address, msg.as_string())
+                sent.append({"name": name, "email": to_address})
+            except Exception as e:
+                print(f"[Email] Failed for {name}: {e}")
+                failed.append({"name": name, "email": to_address, "error": str(e)})
+        except Exception as e:
+            print(f"[Email] Failed for {name}: {e}")
+            failed.append({"name": name, "email": to_address, "error": str(e)})
+        time.sleep(1)  # 1s between emails to respect Gmail rate limits
+
+    server.quit()
     return {"sent": sent, "failed": failed}
