@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bandwidth Allocation</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f4f8;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ─── Header ────────────────────────────────────────────────── */
+    .page-header {
+      background: linear-gradient(135deg, #0066CC 0%, #004fa3 100%);
+      color: #fff;
+      padding: 28px 32px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,102,204,0.3);
+    }
+    .page-header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .page-header .subtitle { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .btn-small {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-small:hover { background: rgba(255,255,255,0.25); }
+
+    /* ─── Layout ────────────────────────────────────────────────── */
+    .container { max-width: 900px; margin: 0 auto; padding: 28px 16px 80px; }
+
+    /* ─── Greeting ──────────────────────────────────────────────── */
+    .greeting-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 22px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .avatar {
+      width: 46px; height: 46px;
+      background: #0066CC;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .greeting-text h2 { font-size: 16px; font-weight: 600; }
+    .greeting-text p { font-size: 13px; color: #555; margin-top: 3px; line-height: 1.5; }
+    .designation-badge {
+      display: inline-block;
+      background: #e8f0fe;
+      color: #0066CC;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* ─── Brand Section ─────────────────────────────────────────── */
+    .brand-section {
+      background: #fff;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .brand-header {
+      background: #0a2a6e;
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .brand-header:hover { background: #0d3385; }
+    .brand-header-left { display: flex; align-items: center; gap: 10px; }
+    .brand-title { font-size: 15px; font-weight: 600; }
+    .brand-count {
+      background: rgba(255,255,255,0.2);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .brand-role-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+    .brand-role-creator  { background: rgba(134,239,172,0.25); color: #bbf7d0; }
+    .brand-role-assignee { background: rgba(147,197,253,0.25); color: #bfdbfe; }
+    .chevron {
+      width: 18px; height: 18px;
+      transition: transform 0.2s;
+      fill: rgba(255,255,255,0.8);
+    }
+    .brand-section.open .chevron { transform: rotate(180deg); }
+    .brand-body { display: none; }
+    .brand-section.open .brand-body { display: block; }
+
+    /* ─── Role Sub-section ──────────────────────────────────────── */
+    .role-section { border-bottom: 1px solid #f0f0f0; }
+    .role-section:last-child { border-bottom: none; }
+    .role-header {
+      background: #f8f9fb;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .role-header:hover { background: #f0f2f5; }
+    .role-header-left { display: flex; align-items: center; gap: 8px; }
+    .role-label { font-size: 13px; font-weight: 600; color: #333; }
+    .role-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .role-badge.creator  { background: #d4edda; color: #155724; }
+    .role-badge.assignee { background: #cce5ff; color: #004085; }
+    .role-badge.other    { background: #e2e3e5; color: #383d41; }
+    .role-chevron { width: 14px; height: 14px; transition: transform 0.2s; fill: #999; }
+    .role-section.open .role-chevron { transform: rotate(180deg); }
+    .role-body { display: none; padding: 0; }
+    .role-section.open .role-body { display: block; }
+
+    /* ─── Ticket Row ────────────────────────────────────────────── */
+    .ticket-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 120px;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 20px;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background 0.1s;
+    }
+    .ticket-row:last-child { border-bottom: none; }
+    .ticket-row:hover { background: #fafbfc; }
+    .ticket-key a {
+      color: #0066CC;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+    .ticket-key a:hover { text-decoration: underline; }
+    .ticket-summary {
+      font-size: 13px;
+      color: #333;
+      line-height: 1.4;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .bandwidth-input-wrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+    .bandwidth-input {
+      width: 72px;
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+      text-align: right;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .bandwidth-input:focus {
+      outline: none;
+      border-color: #0066CC;
+      box-shadow: 0 0 0 3px rgba(0,102,204,0.12);
+    }
+    .bandwidth-input.has-value { border-color: #28a745; }
+    .pct-label { font-size: 13px; color: #666; }
+
+    /* ─── Custom Entries ────────────────────────────────────────── */
+    .custom-section {
+      background: #fff;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border: 2px dashed #0066CC;
+      overflow: hidden;
+    }
+    .custom-header {
+      background: #f0f6ff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .custom-header-left { display: flex; align-items: center; gap: 8px; }
+    .custom-header .label { font-size: 14px; font-weight: 600; color: #0066CC; }
+    .custom-header .hint  { font-size: 12px; color: #666; }
+    .custom-body { padding: 16px 20px; display: none; }
+    .custom-section.open .custom-body { display: block; }
+    .custom-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 36px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .custom-url-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .custom-url-wrap input {
+      flex: 1;
+      padding: 7px 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 13px;
+      transition: border-color 0.15s;
+    }
+    .custom-url-wrap input:focus { outline: none; border-color: #0066CC; }
+    .custom-key-link {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0066CC;
+      text-decoration: none;
+      white-space: nowrap;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      background: #e8f0fe;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .custom-key-link:hover { text-decoration: underline; }
+    .custom-row input[type="number"] {
+      padding: 7px 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 13px;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .custom-row input[type="number"]:focus { outline: none; border-color: #0066CC; }
+    .btn-remove {
+      background: #fff0f0;
+      border: 1px solid #f5c6cb;
+      color: #c82333;
+      border-radius: 5px;
+      width: 32px; height: 32px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .btn-remove:hover { background: #f8d7da; }
+    .btn-add-row {
+      background: #e8f0fe;
+      border: 1px solid #0066CC;
+      color: #0066CC;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 4px;
+    }
+    .btn-add-row:hover { background: #d0e4ff; }
+
+    /* ─── Submit ─────────────────────────────────────────────────── */
+    .submit-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 200;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    }
+    .submit-info { font-size: 13px; color: #555; }
+    .submit-info strong { color: #0066CC; }
+    .btn-submit {
+      background: #0066CC;
+      color: #fff;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      display: flex; align-items: center; gap: 8px;
+      min-width: 160px;
+      justify-content: center;
+    }
+    .btn-submit:hover:not(:disabled) { background: #0052a3; transform: translateY(-1px); }
+    .btn-submit:disabled { background: #88b8e8; cursor: not-allowed; transform: none; }
+
+    /* Spinner */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-submit.loading .spinner { display: block; }
+    .btn-submit.loading .btn-label { display: none; }
+
+    /* ─── Toast / Status ────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      top: 80px; right: 20px;
+      max-width: 380px;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 300;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      display: none;
+      animation: slideIn 0.2s ease;
+    }
+    .toast.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .toast.error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .toast.show    { display: block; }
+    @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+
+    /* ─── Empty state ───────────────────────────────────────────── */
+    .empty-state {
+      padding: 24px 20px;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+    }
+
+    /* ─── Responsive ────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .ticket-row { grid-template-columns: 90px 1fr; }
+      .bandwidth-input-wrap { grid-column: 1 / -1; justify-content: flex-start; }
+      .custom-row { grid-template-columns: 1fr 80px 28px; }
+      .custom-url-wrap { flex-direction: column; align-items: flex-start; }
+      .submit-bar { flex-direction: column; align-items: stretch; }
+      .btn-submit { width: 100%; }
+    }
+
+    /* ─── Misc ──────────────────────────────────────────────────── */
+    .no-tickets { padding: 12px 20px; font-size: 13px; color: #999; font-style: italic; }
+    .ticket-table-header {
+      display: grid;
+      grid-template-columns: 110px 1fr 120px;
+      gap: 12px;
+      padding: 6px 20px 6px;
+      background: #f9fafb;
+      border-bottom: 1px solid #eee;
+    }
+    .ticket-table-header span { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ticket-table-header .col-bw { text-align: right; }
+  </style>
+</head>
+<body>
+
+<script>
+  /* __FORM_DATA_PLACEHOLDER__ */
+</script>
+
+<!-- Page Header -->
+<div class="page-header">
+  <h1 id="page-title">Bandwidth Allocation</h1>
+  <div class="subtitle" id="page-subtitle">Loading…</div>
+  <div class="header-actions">
+    <button class="btn-small" onclick="expandAll()">Expand All</button>
+    <button class="btn-small" onclick="collapseAll()">Collapse All</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="container" id="main-content"></div>
+
+<!-- Submit Bar -->
+<div class="submit-bar">
+  <div class="submit-info">
+    <strong id="filled-count">0</strong> entries filled &nbsp;|&nbsp; Total: <strong id="total-bw" style="color:#28a745;">0</strong>%
+  </div>
+  <button class="btn-submit" id="submit-btn" onclick="submitForm()">
+    <span class="btn-label">Submit Allocation</span>
+    <div class="spinner"></div>
+  </button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const data = window.FORM_DATA;
+  if (!data) {
+    document.getElementById('main-content').innerHTML =
+      '<p style="padding:40px;color:#c00;font-size:15px;">Error: form data not loaded.</p>';
+    throw new Error('FORM_DATA not found');
+  }
+
+  const { personName, designation, brands, quarterLabel, isMock } = data;
+  if (isMock) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#fff3cd;border-bottom:2px solid #ffc107;padding:8px 32px;font-size:13px;font-weight:600;color:#856404;text-align:center;';
+    banner.textContent = '⚠ MOCK MODE — No data will be saved to the sheet or Jira. Safe to test freely.';
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+  const jiraBase = 'https://innovaccer.atlassian.net/browse/';
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  document.getElementById('page-title').textContent = `${quarterLabel} Bandwidth Allocation`;
+  document.getElementById('page-subtitle').textContent = `Logged in as: ${personName}`;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function svg(className) {
+    return `<svg class="${className}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 9l6 6 6-6"/>
+    </svg>`;
+  }
+
+  function roleBadge(role) {
+    const map = { Creator: 'creator', Assignee: 'assignee', Other: 'other' };
+    const cls = map[role] || 'other';
+    return `<span class="role-badge ${cls}">${role}</span>`;
+  }
+
+  function ticketRow(ticket, brand, role) {
+    return `
+      <div class="ticket-row" data-key="${ticket.key}" data-brand="${escHtml(brand)}" data-role="${role}" data-summary="${escHtml(ticket.summary)}">
+        <div class="ticket-key">
+          <a href="${jiraBase}${ticket.key}" target="_blank" rel="noopener">${ticket.key}</a>
+        </div>
+        <div class="ticket-summary" title="${escHtml(ticket.summary)}">${escHtml(ticket.summary)}</div>
+        <div class="bandwidth-input-wrap">
+          <input
+            type="number"
+            class="bandwidth-input"
+            min="0" max="100" step="1"
+            placeholder="—"
+            data-key="${ticket.key}"
+            oninput="onBandwidthChange(this)"
+          />
+          <span class="pct-label">%</span>
+        </div>
+      </div>`;
+  }
+
+  function escHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function roleSection(tickets, role, brand) {
+    if (!tickets || tickets.length === 0) return '';
+    const id = `role-${brand}-${role}`.replace(/\s+/g, '-').toLowerCase();
+    return `
+      <div class="role-section" id="${id}">
+        <div class="role-header" onclick="toggleRole('${id}')">
+          <div class="role-header-left">
+            ${roleBadge(role)}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#888;">${tickets.length} ticket${tickets.length !== 1 ? 's' : ''}</span>
+            <svg class="role-chevron" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="role-body">
+          <div class="ticket-table-header">
+            <span>Ticket</span><span>Summary</span><span class="col-bw">Bandwidth</span>
+          </div>
+          ${tickets.map(t => ticketRow(t, brand, role)).join('')}
+        </div>
+      </div>`;
+  }
+
+  function brandSection(brandName, buckets) {
+    const total = (buckets.asCreator || []).length +
+                  (buckets.asAssignee || []).length +
+                  (buckets.other || []).length;
+    const id = `brand-${brandName}`.replace(/\s+/g, '-').toLowerCase();
+
+    const inner = [
+      roleSection(buckets.asCreator, 'Creator', brandName),
+      roleSection(buckets.asAssignee, 'Assignee', brandName),
+      roleSection(buckets.other, 'Other', brandName),
+    ].join('');
+
+    const creatorCount  = (buckets.asCreator  || []).length;
+    const assigneeCount = (buckets.asAssignee || []).length;
+
+    return `
+      <div class="brand-section" id="${id}">
+        <div class="brand-header" onclick="toggleBrand('${id}')">
+          <div class="brand-header-left">
+            <span class="brand-title">${escHtml(brandName)}</span>
+            <span class="brand-count">${total} ticket${total !== 1 ? 's' : ''}</span>
+            <span class="brand-role-pill brand-role-creator">CREATOR&nbsp;${creatorCount}</span>
+            <span class="brand-role-pill brand-role-assignee">ASSIGNEE&nbsp;${assigneeCount}</span>
+          </div>
+          <svg class="chevron" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="brand-body">
+          ${inner || '<div class="no-tickets">No tickets found.</div>'}
+        </div>
+      </div>`;
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function render() {
+    const container = document.getElementById('main-content');
+    let html = '';
+
+    // Greeting card
+    const initial = personName.charAt(0).toUpperCase();
+    html += `
+      <div class="greeting-card">
+        <div class="avatar">${initial}</div>
+        <div class="greeting-text">
+          <h2>Hello, ${escHtml(personName)}${designation ? `<span class="designation-badge">${escHtml(designation)}</span>` : ''}</h2>
+          <p>Please allocate your bandwidth % for <strong>${escHtml(quarterLabel)}</strong> capitalised tickets below. Bandwidth fields are optional — only fill what's relevant. You can resubmit anytime.</p>
+        </div>
+      </div>`;
+
+    // Brand sections
+    const brandNames = Object.keys(brands);
+    if (brandNames.length === 0) {
+      html += '<div style="background:#fff;border-radius:10px;padding:40px;text-align:center;color:#666;">No tickets found for your brands.</div>';
+    } else {
+      for (const brandName of brandNames) {
+        html += brandSection(brandName, brands[brandName]);
+      }
+    }
+
+    // Custom entries
+    html += `
+      <div class="custom-section" id="custom-section">
+        <div class="custom-header" onclick="toggleCustom()">
+          <div class="custom-header-left">
+            <span class="label">+ Custom Entries</span>
+            <span class="hint">Add tickets not listed above</span>
+          </div>
+          <svg class="role-chevron" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" fill="none" stroke="#0066CC" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="custom-body" id="custom-body">
+          <div id="custom-rows"></div>
+          <button class="btn-add-row" onclick="addCustomRow()">+ Add Row</button>
+        </div>
+      </div>`;
+
+    container.innerHTML = html;
+    updateFilledCount();
+  }
+
+  // ── Toggle ─────────────────────────────────────────────────────────────────
+  window.toggleBrand = function(id) {
+    document.getElementById(id).classList.toggle('open');
+  };
+  window.toggleRole = function(id) {
+    document.getElementById(id).classList.toggle('open');
+  };
+  window.toggleCustom = function() {
+    document.getElementById('custom-section').classList.toggle('open');
+  };
+
+  window.expandAll = function() {
+    document.querySelectorAll('.brand-section, .role-section, .custom-section').forEach(el => el.classList.add('open'));
+  };
+  window.collapseAll = function() {
+    document.querySelectorAll('.brand-section, .role-section, .custom-section').forEach(el => el.classList.remove('open'));
+  };
+
+  // ── Bandwidth input feedback ───────────────────────────────────────────────
+  window.onBandwidthChange = function(input) {
+    input.classList.toggle('has-value', input.value !== '');
+    updateFilledCount();
+  };
+
+  function updateFilledCount() {
+    const regular = document.querySelectorAll('.bandwidth-input');
+    const customBw = document.querySelectorAll('.custom-row-bw');
+    let count = 0;
+    let total = 0;
+
+    regular.forEach(i => {
+      if (i.value !== '') {
+        count++;
+        total += parseFloat(i.value) || 0;
+      }
+    });
+
+    // Custom rows: only count if URL was parsed AND bandwidth is filled
+    document.querySelectorAll('.custom-row').forEach(row => {
+      const urlInput = row.querySelector('.custom-url');
+      const bwInput  = row.querySelector('.custom-row-bw');
+      if (!urlInput || !bwInput) return;
+      if ((urlInput.dataset.extractedKey || '') && bwInput.value !== '') {
+        count++;
+        total += parseFloat(bwInput.value) || 0;
+      }
+    });
+
+    document.getElementById('filled-count').textContent = count;
+    const totalEl = document.getElementById('total-bw');
+    if (totalEl) {
+      totalEl.textContent = Math.round(total * 10) / 10;
+      totalEl.style.color = total > 100 ? '#dc3545' : '#28a745';
+    }
+  }
+
+  // ── Custom rows ────────────────────────────────────────────────────────────
+  let customRowCounter = 0;
+
+  window.onCustomUrlChange = function(input, rowId) {
+    const url = input.value.trim();
+    // Support both URL types:
+    // 1. https://...atlassian.net/browse/IPD-3447
+    // 2. https://...atlassian.net/jira/polaris/...?selectedIssue=IPD-3447&...
+    const browseMatch  = url.match(/\/browse\/([A-Z]+-\d+)/i);
+    const polarisMatch = url.match(/[?&]selectedIssue=([A-Z]+-\d+)/i);
+    const match = browseMatch || polarisMatch;
+    const link = document.getElementById(`ckl-${rowId}`);
+    if (match) {
+      const key = match[1].toUpperCase();
+      input.dataset.extractedKey = key;
+      if (link) {
+        link.textContent = key + ' \u2197';
+        link.href = jiraBase + key;
+        link.style.display = 'inline';
+      }
+    } else {
+      input.dataset.extractedKey = '';
+      if (link) link.style.display = 'none';
+    }
+    updateFilledCount();
+  };
+
+  window.addCustomRow = function() {
+    const id = ++customRowCounter;
+    const row = document.createElement('div');
+    row.className = 'custom-row';
+    row.id = `custom-row-${id}`;
+    row.innerHTML = `
+      <div class="custom-url-wrap">
+        <input type="text" class="custom-url"
+          placeholder="Paste Jira URL \u2014 e.g. https://innovaccer.atlassian.net/browse/IPD-1234"
+          oninput="onCustomUrlChange(this, ${id})" />
+        <a class="custom-key-link" id="ckl-${id}" href="#" target="_blank" rel="noopener" style="display:none"></a>
+      </div>
+      <input type="number" class="custom-row-bw" min="0" max="100" step="1" placeholder="%" oninput="onBandwidthChange(this)"/>
+      <button class="btn-remove" onclick="removeCustomRow(${id})" title="Remove row">&times;</button>
+    `;
+    document.getElementById('custom-rows').appendChild(row);
+    updateFilledCount();
+  };
+
+  window.removeCustomRow = function(id) {
+    const el = document.getElementById(`custom-row-${id}`);
+    if (el) { el.remove(); updateFilledCount(); }
+  };
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  window.submitForm = async function() {
+    const entries = [];
+
+    // Collect regular ticket entries
+    document.querySelectorAll('.ticket-row').forEach(row => {
+      const input = row.querySelector('.bandwidth-input');
+      if (!input || input.value === '') return;
+      const bw = parseFloat(input.value);
+      if (isNaN(bw)) return;
+      entries.push({
+        key: row.dataset.key,
+        summary: row.dataset.summary,
+        brand: row.dataset.brand,
+        role: row.dataset.role,
+        bandwidth: bw,
+      });
+    });
+
+    // Collect custom entries (URL-based)
+    document.querySelectorAll('.custom-row').forEach(row => {
+      const urlInput = row.querySelector('.custom-url');
+      const bwInput  = row.querySelector('.custom-row-bw');
+      if (!urlInput || !bwInput) return;
+      const key = (urlInput.dataset.extractedKey || '').trim();
+      const bw  = parseFloat(bwInput.value);
+      if (!key || isNaN(bw)) return;
+      entries.push({
+        key,
+        summary: '',
+        brand: 'Custom',
+        role: 'Custom',
+        bandwidth: bw,
+      });
+    });
+
+    if (entries.length === 0) {
+      showToast('No bandwidth values entered. Fill at least one field before submitting.', 'error', 4000);
+      return;
+    }
+
+    // Guard: total bandwidth must not exceed 100%
+    const totalBw = entries.reduce((sum, e) => sum + e.bandwidth, 0);
+    if (totalBw > 100) {
+      showToast(`Total bandwidth is ${Math.round(totalBw * 10) / 10}% \u2014 must not exceed 100%. Please reduce your allocations.`, 'error', 5000);
+      return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personName, designation, entries, mock: !!isMock }),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        showToast(`Error: ${result.error || 'Server error'}`, 'error', 6000);
+        return;
+      }
+
+      let msg = `<strong>${result.saved} entr${result.saved === 1 ? 'y' : 'ies'} saved to the log.</strong>`;
+      if (result.jiraSuccess && result.jiraSuccess.length > 0) {
+        msg += `<br>Jira comments posted: ${result.jiraSuccess.join(', ')}`;
+      }
+      if (result.jiraFailed && result.jiraFailed.length > 0) {
+        msg += `<br><em>Jira comment failed for: ${result.jiraFailed.join(', ')}</em>`;
+      }
+      if (result.sheetError) {
+        msg += `<br><em>Warning: sheet write error — ${result.sheetError}</em>`;
+      }
+
+      showToast(msg, result.sheetError ? 'error' : 'success', 8000);
+    } catch (err) {
+      showToast(`Network error: ${err.message}`, 'error', 6000);
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  };
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function showToast(message, type, duration) {
+    const el = document.getElementById('toast');
+    el.innerHTML = message;
+    el.className = `toast ${type} show`;
+    clearTimeout(el._timeout);
+    el._timeout = setTimeout(() => { el.classList.remove('show'); }, duration || 5000);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  render();
+
+})();
+</script>
+</body>
+</html>
