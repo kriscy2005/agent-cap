@@ -1,7 +1,8 @@
-"""Email sending via Gmail SMTP (app password)."""
+"""Email sending via Gmail API (HTTP — works on Railway where SMTP is blocked)."""
 import os
-import smtplib
+import json
 import time
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from urllib.parse import quote
@@ -11,11 +12,34 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env", override=True)
 
 GMAIL_USER = os.getenv("GMAIL_USER", "")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:3000")
 QUARTER_LABEL = os.getenv("QUARTER_LABEL", "Q1'26")
 TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_EMAIL = os.getenv("TEST_EMAIL", "")
+
+SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+SA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "service-account.json")
+
+
+def _get_gmail_service():
+    """Build Gmail API client using service account with domain-wide delegation."""
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
+    scopes = ["https://www.googleapis.com/auth/gmail.send"]
+
+    if SA_JSON:
+        creds = service_account.Credentials.from_service_account_info(
+            json.loads(SA_JSON), scopes=scopes
+        )
+    else:
+        creds = service_account.Credentials.from_service_account_file(
+            SA_PATH, scopes=scopes
+        )
+
+    # Impersonate the GMAIL_USER via domain-wide delegation
+    creds = creds.with_subject(GMAIL_USER)
+    return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
 
 def _build_html(first_name: str, form_url: str) -> str:
@@ -64,8 +88,8 @@ def _build_html(first_name: str, form_url: str) -> str:
 </html>"""
 
 
-def send_allocation_email(name: str, email: str) -> dict:
-    """Sends a personalised email. Returns {sent: bool, to: str, error?: str}"""
+def send_allocation_email(name: str, email: str, gmail_service=None) -> dict:
+    """Sends a personalised email via Gmail API. Returns {sent: bool, to: str, error?: str}"""
     first_name = name.split()[0]
     form_url = f"{BASE_URL}/form?creator={quote(name)}"
     to_address = TEST_EMAIL if TEST_MODE else email
@@ -80,9 +104,12 @@ def send_allocation_email(name: str, email: str) -> dict:
     msg.attach(MIMEText(_build_html(first_name, form_url), "html"))
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_USER, to_address, msg.as_string())
+        if gmail_service is None:
+            gmail_service = _get_gmail_service()
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        gmail_service.users().messages().send(
+            userId="me", body={"raw": raw}
+        ).execute()
         print(f"[Email] Sent to {to_address} ({name})")
         return {"sent": True, "to": to_address}
     except Exception as e:
@@ -92,53 +119,17 @@ def send_allocation_email(name: str, email: str) -> dict:
 
 def send_all_emails(recipients: list) -> dict:
     """recipients: [{name, email}]. Returns {sent: [], failed: []}"""
-    sent, failed = [], []
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        gmail_service = _get_gmail_service()
     except Exception as e:
         return {"sent": [], "failed": [{"name": r["name"], "email": r["email"], "error": str(e)} for r in recipients]}
 
+    sent, failed = [], []
     for r in recipients:
-        name = r["name"]
-        email = r["email"]
-        first_name = name.split()[0]
-        form_url = f"{BASE_URL}/form?creator={quote(name)}"
-        to_address = TEST_EMAIL if TEST_MODE else email
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = (
-            f"Action Required: {QUARTER_LABEL} Bandwidth Allocation"
-            + (f" [TEST — actual: {name} <{email}>]" if TEST_MODE and to_address != email else "")
-        )
-        msg["From"] = f"Product Operations <{GMAIL_USER}>"
-        msg["To"] = to_address
-        msg.attach(MIMEText(_build_html(first_name, form_url), "html"))
-
-        try:
-            server.sendmail(GMAIL_USER, to_address, msg.as_string())
-            print(f"[Email] Sent to {to_address} ({name})")
-            sent.append({"name": name, "email": to_address})
-        except smtplib.SMTPServerDisconnected:
-            # Reconnect and retry once
-            try:
-                server = smtplib.SMTP("smtp.gmail.com", 587)
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-                server.sendmail(GMAIL_USER, to_address, msg.as_string())
-                sent.append({"name": name, "email": to_address})
-            except Exception as e:
-                print(f"[Email] Failed for {name}: {e}")
-                failed.append({"name": name, "email": to_address, "error": str(e)})
-        except Exception as e:
-            print(f"[Email] Failed for {name}: {e}")
-            failed.append({"name": name, "email": to_address, "error": str(e)})
-        time.sleep(1)  # 1s between emails to respect Gmail rate limits
-
-    server.quit()
+        result = send_allocation_email(r["name"], r["email"], gmail_service=gmail_service)
+        if result["sent"]:
+            sent.append({"name": r["name"], "email": result["to"]})
+        else:
+            failed.append({"name": r["name"], "email": result["to"], "error": result.get("error")})
+        time.sleep(0.5)
     return {"sent": sent, "failed": failed}
