@@ -1,0 +1,8 @@
+.env
+service-account.json
+__pycache__
+*.pyc
+.DS_Store
+.git
+tmp_downloads
+debug_screenshots
